@@ -1,0 +1,82 @@
+services:
+  zabbix-postgres:
+    image: postgres:15-alpine
+    container_name: zabbix-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - zabbix-postgres-data:/var/lib/postgresql/data
+    networks:
+      - zabbix-network
+
+  zabbix-server:
+    image: zabbix/zabbix-server-pgsql:alpine-6.0-latest
+    container_name: zabbix-server
+    restart: always
+    environment:
+      DB_SERVER_HOST: zabbix-postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      ZBX_TIMEOUT: ${ZBX_TIMEOUT}
+    ports:
+      - "${ZABBIX_SERVER_PORT}:10051"
+    depends_on:
+      - zabbix-postgres
+    networks:
+      - zabbix-network
+
+  zabbix-web:
+    image: zabbix/zabbix-web-nginx-pgsql:alpine-6.0-latest
+    container_name: zabbix-web
+    restart: always
+    environment:
+      DB_SERVER_HOST: zabbix-postgres
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      ZBX_SERVER_HOST: ${ZBX_SERVER_HOST}
+      PHP_TZ: ${PHP_TZ}
+    ports:
+      - "${ZABBIX_WEB_PORT}:8080"
+    depends_on:
+      - zabbix-postgres
+      - zabbix-server
+    networks:
+      - zabbix-network
+
+  zabbix-agent:
+    image: zabbix/zabbix-agent2:alpine-6.0-latest
+    container_name: zabbix-agent
+    restart: always
+    environment:
+      ZBX_HOSTNAME: ${ZBX_HOSTNAME}
+      ZBX_SERVER_HOST: ${ZBX_SERVER_HOST}
+    privileged: true
+    networks:
+      - zabbix-network
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: grafana
+    restart: always
+    environment:
+      GF_INSTALL_PLUGINS: ${GF_INSTALL_PLUGINS}
+      GF_SECURITY_ADMIN_PASSWORD: ${GF_SECURITY_ADMIN_PASSWORD}
+    ports:
+      - "${GRAFANA_PORT}:3000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+    networks:
+      - zabbix-network
+
+networks:
+  zabbix-network:
+    driver: bridge
+
+volumes:
+  zabbix-postgres-data:
+  grafana-data:
